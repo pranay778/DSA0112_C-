@@ -1,0 +1,408 @@
+#include <iostream>
+#include <iomanip>
+#include <vector>
+#include <string>
+#include <limits>
+using namespace std;
+ 
+const double GST_RATE = 0.12; // 12% tax applied on the bill
+ 
+/* ============================================================
+   ABSTRACT BASE CLASS (virtual base -> avoids diamond duplication)
+   ============================================================ */
+class HotelItem {
+protected:
+    string itemName;
+public:
+    HotelItem() : itemName("Unnamed Item") {}
+    virtual double getCost() const = 0;         // pure virtual
+    virtual string getDescription() const = 0;  // pure virtual
+    virtual void display() const = 0;           // pure virtual
+    virtual ~HotelItem() {}
+};
+ 
+/* ============================================================
+   ROOM HIERARCHY  (single + hierarchical + multilevel inheritance)
+   ============================================================ */
+class Room : virtual public HotelItem {
+protected:
+    int roomNumber;
+    double baseRate;
+    bool available;
+public:
+    Room(int num = 0, double rate = 0.0) : roomNumber(num), baseRate(rate), available(true) {}
+    int getRoomNumber() const { return roomNumber; }
+    double getBaseRate() const { return baseRate; }
+    bool checkAvailability() const { return available; }
+    void setAvailability(bool status) { available = status; }
+    virtual string getRoomType() const = 0;      // still abstract
+};
+ 
+// ---- Hierarchical inheritance: three room categories from Room ----
+class StandardRoom : public Room {
+public:
+    StandardRoom(int num) : Room(num, 1500.0) {}
+    double getCost() const override { return baseRate; }
+    string getDescription() const override { return "Standard Room"; }
+    string getRoomType() const override { return "Standard"; }
+    void display() const override {
+        cout << left << setw(10) << ("Room " + to_string(roomNumber))
+             << setw(14) << "[Standard]" << "Rs." << setw(10) << fixed << setprecision(2) << baseRate
+             << (available ? "Available" : "Occupied") << endl;
+    }
+};
+ 
+class DeluxeRoom : public Room {
+public:
+    DeluxeRoom(int num) : Room(num, 2800.0) {}
+    double getCost() const override { return baseRate; }
+    string getDescription() const override { return "Deluxe Room"; }
+    string getRoomType() const override { return "Deluxe"; }
+    void display() const override {
+        cout << left << setw(10) << ("Room " + to_string(roomNumber))
+             << setw(14) << "[Deluxe]" << "Rs." << setw(10) << fixed << setprecision(2) << baseRate
+             << (available ? "Available" : "Occupied") << endl;
+    }
+};
+ 
+class SuiteRoom : public Room {
+public:
+    SuiteRoom(int num, double rate = 4500.0) : Room(num, rate) {}
+    double getCost() const override { return baseRate; }
+    string getDescription() const override { return "Suite Room"; }
+    string getRoomType() const override { return "Suite"; }
+    void display() const override {
+        cout << left << setw(10) << ("Room " + to_string(roomNumber))
+             << setw(14) << "[Suite]" << "Rs." << setw(10) << fixed << setprecision(2) << baseRate
+             << (available ? "Available" : "Occupied") << endl;
+    }
+};
+ 
+// ---- Multilevel inheritance: PresidentialSuite -> SuiteRoom -> Room ----
+class PresidentialSuite : public SuiteRoom {
+private:
+    double amenityCharge;
+public:
+    PresidentialSuite(int num) : SuiteRoom(num, 6000.0), amenityCharge(2000.0) {}
+    double getCost() const override { return baseRate + amenityCharge; }
+    string getDescription() const override { return "Presidential Suite"; }
+    string getRoomType() const override { return "Presidential Suite"; }
+    void display() const override {
+        cout << left << setw(10) << ("Room " + to_string(roomNumber))
+             << setw(14) << "[Pres.Suite]" << "Rs." << setw(10) << fixed << setprecision(2) << getCost()
+             << (available ? "Available" : "Occupied") << endl;
+    }
+};
+ 
+/* ============================================================
+   SERVICE HIERARCHY (hierarchical inheritance)
+   ============================================================ */
+class Service : virtual public HotelItem {
+protected:
+    double charge;
+public:
+    Service(double c = 0.0) : charge(c) {}
+    double getCost() const override { return charge; }
+};
+ 
+class LaundryService : public Service {
+public:
+    LaundryService() : Service(300.0) {}
+    string getDescription() const override { return "Laundry Service"; }
+    void display() const override { cout << "   Laundry Service - Rs." << fixed << setprecision(2) << charge << endl; }
+};
+ 
+class SpaService : public Service {
+public:
+    SpaService() : Service(1200.0) {}
+    string getDescription() const override { return "Spa Service"; }
+    void display() const override { cout << "   Spa Service - Rs." << fixed << setprecision(2) << charge << endl; }
+};
+ 
+class DiningService : public Service {
+public:
+    DiningService() : Service(800.0) {}
+    string getDescription() const override { return "In-Room Dining"; }
+    void display() const override { cout << "   In-Room Dining - Rs." << fixed << setprecision(2) << charge << endl; }
+};
+ 
+/* ============================================================
+   HYBRID + MULTIPLE INHERITANCE
+   PremiumPackage combines a DeluxeRoom with a SpaService.
+   Both DeluxeRoom (via Room) and SpaService (via Service) inherit
+   HotelItem *virtually*, so PremiumPackage gets ONE shared HotelItem
+   sub-object instead of two ambiguous copies (diamond problem solved).
+   ============================================================ */
+class PremiumPackage : public DeluxeRoom, public SpaService {
+public:
+    PremiumPackage(int num) : DeluxeRoom(num), SpaService() {}
+    double getCost() const override { return DeluxeRoom::getCost() + SpaService::getCost(); }
+    string getDescription() const override { return "Premium Package (Deluxe Room + Spa)"; }
+    string getRoomType() const override { return "Premium Package"; }
+    void display() const override {
+        cout << left << setw(10) << ("Room " + to_string(roomNumber))
+             << setw(14) << "[Premium+Spa]" << "Rs." << setw(10) << fixed << setprecision(2) << getCost()
+             << (available ? "Available" : "Occupied") << endl;
+    }
+};
+ 
+/* ============================================================
+   GUEST  (encapsulation)
+   ============================================================ */
+class Guest {
+private:
+    int guestId;
+    string name, phone, email;
+public:
+    Guest() : guestId(0) {}
+    Guest(int id, string n, string p, string e) : guestId(id), name(n), phone(p), email(e) {}
+    int getId() const { return guestId; }
+    string getName() const { return name; }
+    void display() const {
+        cout << "Guest ID: " << guestId << " | Name: " << name
+             << " | Phone: " << phone << " | Email: " << email << endl;
+    }
+};
+ 
+/* ============================================================
+   RESERVATION (uses Room* / Service* -> runtime polymorphism)
+   ============================================================ */
+class Reservation {
+private:
+    int reservationId;
+    Guest guest;
+    Room* room;                 // polymorphic pointer to base class
+    vector<Service*> services;  // polymorphic pointers to base class
+    int nights;
+    bool active;
+public:
+    Reservation(int id, Guest g, Room* r, int n)
+        : reservationId(id), guest(g), room(r), nights(n), active(true) {}
+ 
+    void addService(Service* s) { services.push_back(s); }
+ 
+    double calculateBill() const {
+        double subtotal = room->getCost() * nights;   // virtual dispatch
+        for (auto s : services) subtotal += s->getCost();
+        return subtotal + subtotal * GST_RATE;
+    }
+ 
+    void generateDetails() const {
+        cout << "\n-------- Reservation #" << reservationId << " --------\n";
+        guest.display();
+        cout << "Room    : "; room->display();
+        cout << "Nights  : " << nights << endl;
+        cout << "Services:\n";
+        if (services.empty()) cout << "   None\n";
+        for (auto s : services) s->display();
+        cout << fixed << setprecision(2);
+        cout << "Total Bill (incl. 12% GST): Rs." << calculateBill() << endl;
+        cout << "Status  : " << (active ? "Active" : "Cancelled") << endl;
+        cout << "-----------------------------------------\n";
+    }
+ 
+    int getId() const { return reservationId; }
+    bool isActive() const { return active; }
+    void cancel() { active = false; room->setAvailability(true); }
+};
+ 
+/* ============================================================
+   HOTEL  (manager / controller class)
+   ============================================================ */
+class Hotel {
+private:
+    vector<Room*> rooms;
+    vector<Guest> guests;
+    vector<Reservation*> reservations;
+    int nextGuestId = 1001;
+    int nextReservationId = 5001;
+ 
+public:
+    Hotel() { setupRooms(); }
+    ~Hotel() {
+        for (auto r : rooms) delete r;
+        for (auto res : reservations) delete res;
+    }
+ 
+    void setupRooms() {
+        rooms.push_back(new StandardRoom(101));
+        rooms.push_back(new StandardRoom(102));
+        rooms.push_back(new DeluxeRoom(201));
+        rooms.push_back(new DeluxeRoom(202));
+        rooms.push_back(new SuiteRoom(301));
+        rooms.push_back(new PresidentialSuite(401));
+        rooms.push_back(new PremiumPackage(501));
+    }
+ 
+    Guest registerGuest(const string& name, const string& phone, const string& email) {
+        Guest g(nextGuestId++, name, phone, email);
+        guests.push_back(g);
+        cout << "\nGuest registered successfully. Guest ID: " << g.getId() << endl;
+        return g;
+    }
+ 
+    Guest* findGuest(int id) {
+        for (auto &g : guests) if (g.getId() == id) return &g;
+        return nullptr;
+    }
+ 
+    void showAvailableRooms() const {
+        cout << "\n--- Room Availability ---\n";
+        for (auto r : rooms) r->display();   // polymorphic call
+    }
+ 
+    Room* findRoom(int roomNumber) {
+        for (auto r : rooms) if (r->getRoomNumber() == roomNumber) return r;
+        return nullptr;
+    }
+ 
+    void makeReservation(int guestId, int roomNumber, int nights, const vector<int>& serviceChoices) {
+        Guest* g = findGuest(guestId);
+        if (!g) { cout << "Guest not found. Please register first.\n"; return; }
+        Room* r = findRoom(roomNumber);
+        if (!r) { cout << "Invalid room number.\n"; return; }
+        if (!r->checkAvailability()) { cout << "Room " << roomNumber << " is not available.\n"; return; }
+        if (nights <= 0) { cout << "Number of nights must be positive.\n"; return; }
+ 
+        Reservation* res = new Reservation(nextReservationId++, *g, r, nights);
+        for (int c : serviceChoices) {
+            Service* s = nullptr;
+            if (c == 1) s = new LaundryService();
+            else if (c == 2) s = new SpaService();
+            else if (c == 3) s = new DiningService();
+            if (s) res->addService(s);
+        }
+        r->setAvailability(false);
+        reservations.push_back(res);
+        cout << "Reservation successful! Reservation ID: " << res->getId() << endl;
+    }
+ 
+    void cancelReservation(int resId) {
+        for (auto res : reservations) {
+            if (res->getId() == resId && res->isActive()) {
+                res->cancel();
+                cout << "Reservation " << resId << " cancelled. Room released.\n";
+                return;
+            }
+        }
+        cout << "Reservation not found or already cancelled.\n";
+    }
+ 
+    void calculateBillFor(int resId) const {
+        for (auto res : reservations) {
+            if (res->getId() == resId) {
+                cout << fixed << setprecision(2);
+                cout << "Total Bill for Reservation " << resId << ": Rs." << res->calculateBill() << endl;
+                return;
+            }
+        }
+        cout << "Reservation not found.\n";
+    }
+ 
+    void generateReservationDetails(int resId) const {
+        for (auto res : reservations) {
+            if (res->getId() == resId) { res->generateDetails(); return; }
+        }
+        cout << "Reservation not found.\n";
+    }
+ 
+    void listAllReservations() const {
+        cout << "\n--- All Reservations ---\n";
+        if (reservations.empty()) { cout << "No reservations yet.\n"; return; }
+        for (auto res : reservations) res->generateDetails();
+    }
+};
+ 
+/* ============================================================
+   UTILITY: safe integer input
+   ============================================================ */
+int readInt(const string& prompt) {
+    int val;
+    while (true) {
+        cout << prompt;
+        if (cin >> val) return val;
+        cout << "Invalid input. Please enter a number.\n";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+}
+ 
+/* ============================================================
+   MAIN  -  menu-driven console interface
+   ============================================================ */
+int main() {
+    Hotel hotel;
+    int choice;
+ 
+    cout << "=====================================================\n";
+    cout << "   WELCOME TO GRAND VISTA HOTEL RESERVATION SYSTEM\n";
+    cout << "=====================================================\n";
+ 
+    do {
+        cout << "\n--------------- MAIN MENU ---------------\n";
+        cout << "1. Register Guest\n";
+        cout << "2. Check Room Availability\n";
+        cout << "3. Make Reservation\n";
+        cout << "4. Cancel Reservation\n";
+        cout << "5. Calculate Bill\n";
+        cout << "6. Generate Reservation Details\n";
+        cout << "7. List All Reservations\n";
+        cout << "8. Exit\n";
+        choice = readInt("Enter your choice: ");
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+ 
+        switch (choice) {
+            case 1: {
+                string name, phone, email;
+                cout << "Enter guest name: "; getline(cin, name);
+                cout << "Enter phone number: "; getline(cin, phone);
+                cout << "Enter email: "; getline(cin, email);
+                hotel.registerGuest(name, phone, email);
+                break;
+            }
+            case 2:
+                hotel.showAvailableRooms();
+                break;
+            case 3: {
+                int gid = readInt("Enter Guest ID: ");
+                int rnum = readInt("Enter Room Number: ");
+                int nights = readInt("Enter number of nights: ");
+                int svcCount = readInt("How many additional services? (0-3): ");
+                vector<int> choices;
+                for (int i = 0; i < svcCount; i++) {
+                    int c = readInt("  Service (1-Laundry, 2-Spa, 3-Dining): ");
+                    choices.push_back(c);
+                }
+                hotel.makeReservation(gid, rnum, nights, choices);
+                break;
+            }
+            case 4: {
+                int rid = readInt("Enter Reservation ID to cancel: ");
+                hotel.cancelReservation(rid);
+                break;
+            }
+            case 5: {
+                int rid = readInt("Enter Reservation ID: ");
+                hotel.calculateBillFor(rid);
+                break;
+            }
+            case 6: {
+                int rid = readInt("Enter Reservation ID: ");
+                hotel.generateReservationDetails(rid);
+                break;
+            }
+            case 7:
+                hotel.listAllReservations();
+                break;
+            case 8:
+                cout << "\nThank you for using Grand Vista Hotel Reservation System!\n";
+                break;
+            default:
+                cout << "Invalid choice. Please try again.\n";
+        }
+    } while (choice != 8);
+ 
+    return 0;
+}
+ 
+ 
